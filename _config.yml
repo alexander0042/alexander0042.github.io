@@ -1,6 +1,3 @@
 theme: jekyll-theme-slate
 title: Bright Ground API
 description: Formatted weather API using public models
-customjs:
- - https://brightumbrella2.azurewebsites.net/assets/javascripts/all-3c841d57.js
- - https://brightground.digital/signup.js

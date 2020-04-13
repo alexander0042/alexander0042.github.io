@@ -12,4 +12,4 @@ To try to address this, I've put together a service that reads weather forecasts
 
 
 ## Sign Up!
- <div id="apidatagov_signup">Loading signup form...</div>
+{% include signup.html %}
