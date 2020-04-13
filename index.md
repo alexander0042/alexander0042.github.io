@@ -32,7 +32,7 @@ To try to address this, I've put together a service that reads weather forecasts
      //
      // The format for e-mail addresses can be given as either
      // 'example@example.com' or 'mailto:example@example.com'.
-     contactUrl: 'https://agency.gov/contact',
+     contactUrl: 'https://brightground.digital/contact',
 
      // Provide the name of your developer site. This will appear in the
      // subject of the welcome e-mail as "Your {{siteName}} API key".
@@ -42,7 +42,7 @@ To try to address this, I've put together a service that reads weather forecasts
      // actual address will be "noreply@api.data.gov", but this will
      // change the name of the displayed sender in this fashion:
      // "{{emailFromName}} <noreply@api.data.gov>".
-     emailFromName: 'mail@alexanderrey.ca',
+     emailFromName: 'noreply@brightground.digital',
 
      // Provide an example URL you want to show to users after they signup.
      // This can be any API endpoint on your server, and you can use the
@@ -70,11 +70,11 @@ To try to address this, I've put together a service that reads weather forecasts
 
      // OPTIONAL: Provide an extra checkbox asking the user to agree to terms
      // and conditions before signing up. Defaults to false.
-     // termsCheckbox: true,
+     termsCheckbox: true,
 
      // OPTIONAL: If the terms & conditions checkbox is enabled, link to this
      // URL for your API's terms & conditions. Defaults to "".
-     // termsUrl: "https://agency.gov/api-terms/",
+     termsUrl: "https://brightground.digital/api-terms/",
    };
 
    /* * * DON'T EDIT BELOW THIS LINE * * */
