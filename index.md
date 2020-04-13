@@ -1,37 +1,87 @@
-## Welcome to GitHub Pages
+## Bright Ground API
 
-You can use the [editor on GitHub](https://github.com/alexander0042/alexander0042.github.io/edit/master/index.md) to maintain and preview the content for your website in Markdown files.
+Weather forecasts are is primarily found using models run by goverment agencies, but the outputs aern't easy to use or in formats built for web hosting.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+To try to address this, I've put together a service that reads weather forecasts and serves it following the [Dark Sky API](https://darksky.net/dev/docs) style. 
 
-### Markdown
+### Source Models 
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+* HRRR
+* NAM
+* GFS
 
-```markdown
-Syntax highlighted code block
 
-# Header 1
-## Header 2
-### Header 3
+## Sign Up!
+{% raw %}
+<script src="https://brightumbrella2.azurewebsites.net/assets/javascripts/all-3c841d57.js"></script>
+ <div id="apidatagov_signup">Loading signup form...</div>
+ <script type="text/javascript">
+   /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+   var apiUmbrellaSignupOptions = {
+     // Pick a short, unique name to identify your site, like 'gsa-auctions'
+     // in this example.
+     registrationSource: 'web',
 
-- Bulleted
-- List
+     // Enter the API key you signed up for and specially configured for this
+     // API key signup embed form.
+     apiKey: 'fy23AoKihBQLW6YzNbEA4QSVkDAzyeYXarqpGcii',
 
-1. Numbered
-2. List
+     // Provide a URL or e-mail address to be used for customer support.
+     //
+     // The format for e-mail addresses can be given as either
+     // 'example@example.com' or 'mailto:example@example.com'.
+     contactUrl: 'https://agency.gov/contact',
 
-**Bold** and _Italic_ and `Code` text
+     // Provide the name of your developer site. This will appear in the
+     // subject of the welcome e-mail as "Your {{siteName}} API key".
+     siteName: 'Bright Ground API',
 
-[Link](url) and ![Image](src)
-```
+     // Provide a sender name for who the welcome email appears from. The
+     // actual address will be "noreply@api.data.gov", but this will
+     // change the name of the displayed sender in this fashion:
+     // "{{emailFromName}} <noreply@api.data.gov>".
+     emailFromName: 'mail@alexanderrey.ca',
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
+     // Provide an example URL you want to show to users after they signup.
+     // This can be any API endpoint on your server, and you can use the
+     // special {{api_key}} variable to automatically substitute in the API
+     // key the user just signed up for.
+     exampleApiUrl: 'https://api.data.gov/gsa/auctions?api_key={{api_key}}&format=JSON',
 
-### Jekyll Themes
+     // OPTIONAL: Provide extra content to display on the signup confirmation
+     // page. This will be displayed below the user's API key and the example
+     // API URL are shown. HTML is allowed. Defaults to ""
+     signupConfirmationMessage: 'Success!',
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/alexander0042/alexander0042.github.io/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+     // OPTIONAL: Set to true to verify the user's e-mail address by only
+     // sending them their API key via e-mail, and not displaying it on the
+     // signup confirmation web page. Defaults to false.
+     verifyEmail: true
 
-### Support or Contact
+     // OPTIONAL: Set to false to disable sending a welcome e-mail to the
+     // user after signing up. Defaults to true.
+     // sendWelcomeEmail: false,
 
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+     // OPTIONAL: Provide an extra input field to ask for the user's website.
+     // Defaults to false.
+     // websiteInput: true,
+
+     // OPTIONAL: Provide an extra checkbox asking the user to agree to terms
+     // and conditions before signing up. Defaults to false.
+     // termsCheckbox: true,
+
+     // OPTIONAL: If the terms & conditions checkbox is enabled, link to this
+     // URL for your API's terms & conditions. Defaults to "".
+     // termsUrl: "https://agency.gov/api-terms/",
+   };
+
+   /* * * DON'T EDIT BELOW THIS LINE * * */
+   (function() {
+     var apiUmbrella = document.createElement('script'); apiUmbrella.type = 'text/javascript'; apiUmbrella.async = true;
+     apiUmbrella.src = 'https://brightumbrella2.azurewebsites.net/assets/javascripts/signup_embed.js';
+     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(apiUmbrella);
+   })();
+ </script>
+ <noscript>Please enable JavaScript to signup for an <a href="http://api.data.gov/">api.data.gov</a> API key.</noscript>
+ 
+ {% endraw %}
