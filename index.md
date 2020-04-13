@@ -56,7 +56,7 @@ To try to address this, I've put together a service that reads weather forecasts
      // OPTIONAL: Set to true to verify the user's e-mail address by only
      // sending them their API key via e-mail, and not displaying it on the
      // signup confirmation web page. Defaults to false.
-     verifyEmail: true
+     verifyEmail: true,
 
      // OPTIONAL: Set to false to disable sending a welcome e-mail to the
      // user after signing up. Defaults to true.
