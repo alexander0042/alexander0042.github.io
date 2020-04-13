@@ -13,7 +13,7 @@ To try to address this, I've put together a service that reads weather forecasts
 
 ## Sign Up! 
 <div id="api_umbrella_signup">Loading signup form...</div>
-
+<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 <script src="https://brightumbrella2.azurewebsites.net/assets/javascripts/all-3c841d57.js"></script>
 <script src="https://code.jquery.com/jquery-1.10.2.js"></script><title></title>
 <script>
