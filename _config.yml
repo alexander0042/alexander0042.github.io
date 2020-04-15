@@ -1,4 +1,4 @@
 theme: jekyll-theme-slate
 title: Bright Ground API
 description: Formatted weather API using public models
-baseurl: api.alexanderrey.ca
+baseurl: api.brightground.digital
