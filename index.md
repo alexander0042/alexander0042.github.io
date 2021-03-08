@@ -28,7 +28,7 @@ What ended up working here was discovering the AWS Elastic File System [(EFS)](h
 
 That is the "one-sentence" explanation of how this is set up, but for more details, read on!
 
-<iframe src="https://app.cloudcraft.co/view/a7efdf8d-2e5d-42aa-a4af-f2580ed530a0?key=Ajv5kydDX7i4A5526Dl4HA">
+<iframe src="https://app.cloudcraft.co/view/a7efdf8d-2e5d-42aa-a4af-f2580ed530a0?key=Ajv5kydDX7i4A5526Dl4HA" width="375" height="500">
 </iframe>
 
 ### Data Sources
