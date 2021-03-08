@@ -5,11 +5,11 @@ Before I go any farther, I wanted to add a link to support this project. Running
 
 <a href="https://www.buymeacoffee.com/pirateweather" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 ## Background
-This project started from two points: as part of my [PhD](https://coastlines.engineering.queensu.ca/dunexrt), I had to become very familiar with working with NOAA forecast results. Separately, an old tablet set up as a "Magic Mirror,” and was using a [weather module](https://github.com/jclarke0000/MMM-DarkSkyForecast) that relied on the Dark Sky API. So when I heard that it was [shutting down](https://blog.darksky.net/dark-sky-has-a-new-home/), I thought, "I wonder if I could do this.” Plus, I had been looking for a project to learn Python on, so this seemed like a perfect opportunity! 
+This project started from two points: as part of my [PhD](https://coastlines.engineering.queensu.ca/dunexrt), I had to become very familiar with working with NOAA forecast results (<https://orcid.org/0000-0003-4725-3251>)
+). Separately, an old tablet set up as a "Magic Mirror,” and was using a [weather module](https://github.com/jclarke0000/MMM-DarkSkyForecast) that relied on the Dark Sky API. So when I heard that it was [shutting down](https://blog.darksky.net/dark-sky-has-a-new-home/), I thought, "I wonder if I could do this.” Plus, I had been looking for a project to learn Python on, so this seemed like a perfect opportunity! 
 
-Spoiler alert, but it was much, much more difficult than I thought, but learned a lot throughout the process, and I think the end result turned out really well!
+Spoiler alert, but it was much, much more difficult than I thought, but learned a lot throughout the process, and I think the end result turned out really well! 
 
-<div itemscope itemtype="https://schema.org/Person"><a itemprop="sameAs" content="https://orcid.org/0000-0003-4725-3251" href="https://orcid.org/0000-0003-4725-3251" target="orcid.widget" rel="me noopener noreferrer" style="vertical-align:top;"><img src="https://orcid.org/sites/default/files/images/orcid_16x16.png" style="width:1em;margin-right:.5em;" alt="ORCID iD icon">https://orcid.org/0000-0003-4725-3251</a></div>
 
 ### First Attempt- Microsoft Azure
 My first attempt at setting this up was on [Microsoft Azure](https://azure.microsoft.com/en-ca/). They had a great [student credit offer](https://azure.microsoft.com/en-ca/free/students/), and running docker containers worked really well. 
