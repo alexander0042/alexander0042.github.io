@@ -1,22 +1,20 @@
-## PirateWeather API
-
 Weather forecasts are is primarily found using models run by goverment agencies, but the outputs aern't easy to use or in formats built for web hosting.
 
 To try to address this, I've put together a service that reads weather forecasts and serves it following the [Dark Sky API](https://web.archive.org/web/20200723173936/https://darksky.net/dev/docs) style. Key details about setup/ usage of the API are on the main website <https://pirateweather.net/>, but I also wanted to give an overview of how I assembled all the pieces. I many online guides during this process, so wanted to try to help someone else here! 
 
-### Background
+## Background
 
 This project started from two points: as part of my [PhD](https://coastlines.engineering.queensu.ca/dunexrt), I had to become very familier with working with NOAA forecast results. Seperatly, a an old tablet setup as a "Magic Mirror", and was using a [weather module](https://github.com/jclarke0000/MMM-DarkSkyForecast) that relied on the Dark Sky API. So when I heard that it was [shutting down](https://blog.darksky.net/dark-sky-has-a-new-home/), I thought "I wonder if I could do this". Plus, I had been looking for a project to learn Python on, so this seemed like a perfect opportunity! 
 
 Spoiler alert, it was much, mych more more difficiult than I thought, but learned a lot throughout the process, and I think the end result turned out really well!
 
-#### First Attempt- Microsoft Azure
+### First Attempt- Microsoft Azure
 
 My first attempt at setting this up was on [Microsoft Azure](https://azure.microsoft.com/en-ca/). They had a great [student credit offer](https://azure.microsoft.com/en-ca/free/students/), and running docker containers worked really well. 
 
 However, I ran into issues with data ingest, and couldn't figure out a good way to store the files in a way that I could easily read them later. There is probably a solution to this, but I got distracted with other work and my student credit ran out. Of the three clouds that I tried, I found the interface the easiest to use, and had the least complex networking and permissions setup though! 
 
-#### Second Attempt- Google Cloud
+### Second Attempt- Google Cloud
 
 Ny next attempt was to try [Google's Cloud](https://cloud.google.com/). Their BigQuery GIS product looked really interesting, since it handled large georeferenced datasets naturailly. Google also stored the weather model data in their cloud already, simplifing data transfer.
 
@@ -26,7 +24,7 @@ This was all working well, but where this approach broke down was on data ingest
 
 What ended up "working" was merging the csv files, and then uploading that file. This required an incredbily messy bash script though, and required spinning up a VM with a ton of memory and processing in order to make it reasonably fast. So despite this approach almost working, and being very cool (weather maps would have been very easy), I ended up abandoming it. 
 
-### Current Process- AWS 
+## Current Process- AWS 
 
 What ended up working here was discovering the AWS Elastic File System [(EFS)](https://aws.amazon.com/efs/). I wanted to avoid "reinventing the wheel" as much as possibile, and there is already a great tool for extracting data from forecast files- [WGRIB2](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/)! Moreover, NOAA data was [already being stored](https://registry.opendata.aws/collab/noaa/) on AWS. This meant that, from the 10,000 ft perspective, data could be downloaded and stored on a filesystem that could then be easily accessed by a serverless fucntion, instead of trying to move it to a database.
 
@@ -47,14 +45,14 @@ There are a number of other models that I could have used as part of this API. T
 
 Forecast data is provided by NOAA in [GRIB2 format](https://en.wikipedia.org/wiki/GRIB). This file type has a steep learning curve, but is brilliant once I realized how it worked. In short, it saves all the forecast parameters, and includes metadata on their names and units. GRIB files are compressed to save space, but are referenced in a way that lets individual parameters be quickly extracted. In order to see what is going on in a GRIB file, the NASA [Panoply](https://www.giss.nasa.gov/tools/panoply/) reader works incredibly well.
 
-#### Data Ingest
+### Data Ingest
 
 * AWS Public Cloud
 * SNS Alerts
 * pyWGRIB2
 * Lambda
 
-#### Data Processing
+### Data Processing
 
 * POP- ensemble
 * WGRIB2 to NetCDF
@@ -62,7 +60,7 @@ Forecast data is provided by NOAA in [GRIB2 format](https://en.wikipedia.org/wik
 * NetCDF chunking 
 * NetCDF compression
 
-#### Data Retrieval
+### Data Retrieval
 
 * NetCDF read
 * Interpolate 
@@ -70,13 +68,13 @@ Forecast data is provided by NOAA in [GRIB2 format](https://en.wikipedia.org/wik
 * Icons
 * Sunrise/sunset
 
-#### AWS API
+### AWS API
 
 * API Gateway 
 * Developer Portal
 
 
-
+## Next Steps
 
 
 
