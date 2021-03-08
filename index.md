@@ -2,6 +2,8 @@ Weather forecasts are is primarily found using models run by goverment agencies,
 
 To try to address this, I've put together a service that reads weather forecasts and serves it following the [Dark Sky API](https://web.archive.org/web/20200723173936/https://darksky.net/dev/docs) style. Key details about setup/ usage of the API are on the main website <https://pirateweather.net/>, but I also wanted to give an overview of how I assembled all the pieces. I many online guides during this process, so wanted to try to help someone else here! 
 
+<a href="https://www.buymeacoffee.com/pirateweather" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+
 ## Background
 
 This project started from two points: as part of my [PhD](https://coastlines.engineering.queensu.ca/dunexrt), I had to become very familier with working with NOAA forecast results. Seperatly, a an old tablet setup as a "Magic Mirror", and was using a [weather module](https://github.com/jclarke0000/MMM-DarkSkyForecast) that relied on the Dark Sky API. So when I heard that it was [shutting down](https://blog.darksky.net/dark-sky-has-a-new-home/), I thought "I wonder if I could do this". Plus, I had been looking for a project to learn Python on, so this seemed like a perfect opportunity! 
