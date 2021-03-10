@@ -52,11 +52,11 @@ Forecast data is provided by NOAA in [GRIB2 format](https://en.wikipedia.org/wik
 
 ### Lambda and WGRIB2 Setup
 
-AWS [Lambda](https://aws.amazon.com/lambda/) allows code to run without requring any underlying server infastructure (*serverless*). In my case, I used Python as the target language, since I was interested in learning it! Once triggered, a Lambda function will run with the configured memory. It can pull data from S3 or the Elastic File System [(EFS)](https://aws.amazon.com/efs/), and can use information passed as part of the trigger. Lambda functions can depend on layers, or supporting code packages. In Python, almost anything that that comes via an `import` line needs to be added as a layer. However, the total size of these layers can't exceed [250 mb](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html, which seems like a lot of space until it isn't. 
+AWS [Lambda](https://aws.amazon.com/lambda/) allows code to run without requring any underlying server infastructure (*serverless*). In my case, I used Python as the target language, since I was interested in learning it! Once triggered, a Lambda function will run with the configured memory. It can pull data from S3 or the Elastic File System [(EFS)](https://aws.amazon.com/efs/), and can use information passed as part of the trigger. Lambda functions can depend on layers, or supporting code packages. In Python, almost anything that that comes via an `import` line needs to be added as a layer. However, the total size of these layers can't exceed [250 mb](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), which seems like a lot of space until it isn't. 
+
 For this application, I wanted to use the [WGRIB2](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/) application as much as I could, since it has been extensievly optamized for this sort of work. Convinetly enough, [pywgrib2](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/pywgrib2.html) was recently released, which is the Python interface for working with WGRIB2 files. I used the [pywgrib2_s](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/pywgrib2_s.html) flavour, and then always called it using the `.wgrib2` [method](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/pywgrib2_s_wgrib2.html). The package has some interesting tools for reading gribs without having to call the C routines directly (and an xarray version), which would be faster; however, I couldn't get them to work. There are several great [guides](https://wahlnetwork.com/2020/07/28/how-to-create-aws-lambda-layers-for-python/) on how to do this, but in short:
 
-* Create a Python virtual enviorment in an EC2 instance
-   * Doing this on Amazon Linix helped fix some dependancy issues
+* Create a Python virtual enviorment in an Amazon Linux EC2 instance
 * `pip install` the package that's needed
 * Zip tht `site-packages` folder
 * Import to AWS
@@ -71,12 +71,14 @@ Forecasts are saved from NOAA onto the [AWS Public Cloud](https://registry.opend
 
 This function first checks if the file added to NOAA's bucket (that triggered the function) meets the a list of requirements- there are a lot more files added to the buckets than are needed for weather forecasting, so a regex is used to filter out unnecessary ones. If the grib file is needed, then the function extracts the forecast time and run time (ex. a file for forecast hour 6 from a model run a 18:00 UTC would be T18Z, F006). The grib file is downloaded to the Lambda `/tmp/` directory, then the `-match` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/match.html) runs to extract the required parameters (2 m temperature, wind, precipitation type, pressure, visibility, dewpoint, cloud cover, relative humidity, etc.). 
 
-For the HRRR model, the wind directions need to be converted from [grid relative to earth relative](https://github.com/blaylockbk/pyBKB_v2/blob/master/demos/HRRR_earthRelative_vs_gridRelative_winds.ipynb), using the wgrib2 `-new_grid_winds` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/new_grid_winds.html). For the GFS model, there are two accumilated precipitation fields (`APCP`), one representing 3 hours of accumilation, and one represeting 0 to the forecast hour. wgrib2 has a ` -ncep_norm` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ncep_norm.html); however, it requires that all the time steps are in the same grib file, which isn't how they're saved to the buckets. Instead, I used tip #66 from the (ever handy) [wgrib2 tricks](https://www.ftp.cpc.ncep.noaa.gov/wd51we/wgrib2/tricks.wgrib2) site, and added the `-quit` command to stop wgrib2 from processing the second `APCP ` record. 
+For the HRRR model, the wind directions need to be converted from [grid relative to earth relative](https://github.com/blaylockbk/pyBKB_v2/blob/master/demos/HRRR_earthRelative_vs_gridRelative_winds.ipynb), using the wgrib2 `-new_grid_winds` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/new_grid_winds.html). For the GFS model, there are two accumilated precipitation fields (`APCP`), one representing 3 hours of accumilation, and one represeting 0 to the forecast hour. wgrib2 has a `-ncep_norm` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ncep_norm.html); however, it requires that all the time steps are in the same grib file, which isn't how they're saved to the buckets. Instead, I used tip #66 from the (ever handy) [wgrib2 tricks](https://www.ftp.cpc.ncep.noaa.gov/wd51we/wgrib2/tricks.wgrib2) site, and added the `-quit` command to stop wgrib2 from processing the second `APCP` record. 
+
+My complete pywgrib2_s command ended up looking like this:
+'pywgrib2_s.wgrib2([download_path, '-new_grid_winds', 'earth', '-new_grid_interpolation', 'neighbor', '-match', matchString, '-new_grid', HRRR_grid1, HRRR_grid2, HRRR_grid3, download_path_GB])'
+'pywgrib2_s.wgrib2([download_path, '-rewind_init', download_path, '-new_grid_winds', 'earth', '-new_grid_interpolation', 'neighbor', '-match', 'APCP', '-append','-new_grid', HRRR_grid1, HRRR_grid2, HRRR_grid3, download_path_GB, '-quit'])'
+Where `matchString` was the list of parameters, `HRRR_grid1, HRRR_grid2, HRRR_grid3` are the HRRR grid parameters, and `download_path_GB` was the output file location.
 
 Once wgrib2 has run, the function then uploads the processed grib file to my own s3 bucket. Since only the key parameters are included, the bucket size is fairly small (<15 GB), but it does generate a **lot** of `PUT` requests, particularly for the ensemble forecast (240 hours/ 3 hours per forecast step is 80 files, multiplied by 4 model runs per day, multiplied by 30 ensemble members gives 9,600 actions a day, or about 300,000 per month). 
-
-
-
 
 ### Data Processing
 * POP- ensemble
@@ -84,13 +86,17 @@ Once wgrib2 has run, the function then uploads the processed grib file to my own
 * In-memory operations
 * NetCDF chunking 
 * NetCDF compression
+
 ### Data Retrieval
+
 * NetCDF read
 * Interpolate 
 * Calculate other parameters
 * Icons
 * Sunrise/sunset
+
 ### AWS API
+
 * API Gateway 
 * Developer Portal
 
