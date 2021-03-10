@@ -49,11 +49,35 @@ There are a number of other models that I could have used as part of this API. T
 
 Forecast data is provided by NOAA in [GRIB2 format](https://en.wikipedia.org/wiki/GRIB). This file type has a steep learning curve, but is brilliant once I realized how it worked. In short, it saves all the forecast parameters, and includes metadata on their names and units. GRIB files are compressed to save space, but are referenced in a way that lets individual parameters be quickly extracted. In order to see what is going on in a GRIB file, the NASA [Panoply](https://www.giss.nasa.gov/tools/panoply/) reader works incredibly well.
 
+
+### Lambda and WGRIB2 Setup
+
+AWS [Lambda](https://aws.amazon.com/lambda/) allows code to run without requring any underlying server infastructure (*serverless*). In my case, I used Python as the target language, since I was interested in learning it! Once triggered, a Lambda function will run with the configured memory. It can pull data from S3 or the Elastic File System [(EFS)](https://aws.amazon.com/efs/), and can use information passed as part of the trigger. Lambda functions can depend on layers, or supporting code packages. In Python, almost anything that that comes via an `import` line needs to be added as a layer. However, the total size of these layers can't exceed [250 mb](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html, which seems like a lot of space until it isn't. 
+For this application, I wanted to use the [WGRIB2](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/) application as much as I could, since it has been extensievly optamized for this sort of work. Convinetly enough, [pywgrib2](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/pywgrib2.html) was recently released, which is the Python interface for working with WGRIB2 files. I used the [pywgrib2_s](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/pywgrib2_s.html) flavour, and then always called it using the `.wgrib2` [method](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/pywgrib2_s_wgrib2.html). The package has some interesting tools for reading gribs without having to call the C routines directly (and an xarray version), which would be faster; however, I couldn't get them to work. There are several great [guides](https://wahlnetwork.com/2020/07/28/how-to-create-aws-lambda-layers-for-python/) on how to do this, but in short:
+
+* Create a Python virtual enviorment in an EC2 instance
+   * Doing this on Amazon Linix helped fix some dependancy issues
+* `pip install` the package that's needed
+* Zip tht `site-packages` folder
+* Import to AWS
+
+There were two magor issues I ran into. One was that running out of space for the layer, which I solved by going through the `site-packages` and removing anything that seemed unnecessary, the testing the function and hoping that everything worked. Particularly with pywgrib2, there were several large test/ documentation/ resources that are not required for every case, so I could get the layer to fit within the limit. The second problem was fixed by adding enviormental variables for `PATH` and `LD_LIBRARY_PATH` pointing to subfolders with important libaries. I also found [this GitHub repo](https://github.com/mthenw/awesome-layers) of helpful Lambda layers, and the [GeoLambda](https://github.com/developmentseed/geolambda) project. GeoLambda *almost* worked for everything, and would have been much easier, but unforuntily didn't leave enough space to install WGRIB2. 
+
+Beyond WGRIB2, I also created layers for [NetCDF4](https://unidata.github.io/netcdf4-python/), [Astral](https://pypi.org/project/astral/), [pytz](https://pypi.org/project/pytz/), and [timezonefinder](https://pypi.org/project/timezonefinder/). 
+
 ### Data Ingest
-* AWS Public Cloud
-* SNS Alerts
-* pyWGRIB2
-* Lambda
+
+Forecasts are saved from NOAA onto the [AWS Public Cloud](https://registry.opendata.aws/collab/noaa/) into two buckets for the [HRRR](https://registry.opendata.aws/noaa-hrrr-pds/) and [GFS](https://registry.opendata.aws/noaa-gfs-bdp-pds/) models. Each time a new file is added to these buckets, S3 sends a notification using AWS's [SNS](https://aws.amazon.com/sns/?whats-new-cards.sort-by=item.additionalFields.postDateTime&whats-new-cards.sort-order=desc), which triggers a Lambda function. 
+
+This function first checks if the file added to NOAA's bucket (that triggered the function) meets the a list of requirements- there are a lot more files added to the buckets than are needed for weather forecasting, so a regex is used to filter out unnecessary ones. If the grib file is needed, then the function extracts the forecast time and run time (ex. a file for forecast hour 6 from a model run a 18:00 UTC would be T18Z, F006). The grib file is downloaded to the Lambda `/tmp/` directory, then the `-match` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/match.html) runs to extract the required parameters (2 m temperature, wind, precipitation type, pressure, visibility, dewpoint, cloud cover, relative humidity, etc.). 
+
+For the HRRR model, the wind directions need to be converted from [grid relative to earth relative](https://github.com/blaylockbk/pyBKB_v2/blob/master/demos/HRRR_earthRelative_vs_gridRelative_winds.ipynb), using the wgrib2 `-new_grid_winds` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/new_grid_winds.html). For the GFS model, there are two accumilated precipitation fields (`APCP`), one representing 3 hours of accumilation, and one represeting 0 to the forecast hour. wgrib2 has a ` -ncep_norm` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ncep_norm.html); however, it requires that all the time steps are in the same grib file, which isn't how they're saved to the buckets. Instead, I used tip #66 from the (ever handy) [wgrib2 tricks](https://www.ftp.cpc.ncep.noaa.gov/wd51we/wgrib2/tricks.wgrib2) site, and added the `-quit` command to stop wgrib2 from processing the second `APCP ` record. 
+
+Once wgrib2 has run, the function then uploads the processed grib file to my own s3 bucket. Since only the key parameters are included, the bucket size is fairly small (<15 GB), but it does generate a **lot** of `PUT` requests, particularly for the ensemble forecast (240 hours/ 3 hours per forecast step is 80 files, multiplied by 4 model runs per day, multiplied by 30 ensemble members gives 9,600 actions a day, or about 300,000 per month). 
+
+
+
+
 ### Data Processing
 * POP- ensemble
 * WGRIB2 to NetCDF
