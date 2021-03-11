@@ -47,6 +47,8 @@ The GFS model also underpins the Global Ensemble Forecast System [(GEFS)](https:
 #### Others
 There are a number of other models that I could have used as part of this API. The Canadian model [(HRDPS)](https://weather.gc.ca/grib/grib2_HRDPS_HR_e.html) is even higher resolution (2.5 km), and seems to do particularly well with precipitation. Also, the [European models](https://www.ecmwf.int/en/forecasts) are sometimes considered better global models than the GFS model is, which would make it a great addition. However, HRRR and GFS were enough to get things working, and since they are stored on AWS already, there were no data transfer costs! 
 
+As the rest of this document explains, the data pipeline here is fairly flexable, and given enough interest, it would be relatively straightforward to add additional model sources/ historic forecasts.  
+
 Forecast data is provided by NOAA in [GRIB2 format](https://en.wikipedia.org/wiki/GRIB). This file type has a steep learning curve, but is brilliant once I realized how it worked. In short, it saves all the forecast parameters, and includes metadata on their names and units. GRIB files are compressed to save space, but are referenced in a way that lets individual parameters be quickly extracted. In order to see what is going on in a GRIB file, the NASA [Panoply](https://www.giss.nasa.gov/tools/panoply/) reader works incredibly well.
 
 
@@ -99,6 +101,7 @@ The overall processing flow is fairly straightward:
 4. Copy variables over from NetCDF3 to NetCDF4, enabling compression and significant digit limts for each one 
 5. Download subsiquent forecast time steps, convert to NetCDF3 and appand the data to the end of the NetCDF4 file
 6. [Chunk](https://www.unidata.ucar.edu/software/netcdf/workshops/2011/nc4chunking/) the NetCDF4 file by time to dramatically speed up access times and save to EFS
+7. A seperate pickle file is saved with the latitudes and longitudes of each grid node
 
 While the process is simple, the details here are tricky. This function had to run quickly because it required significant amounts of memory, which drives up the Lambda bill, and also had to avoid writing to EFS as much as possibile, since that burned through my [burst credits ](https://aws.amazon.com/premiumsupport/knowledge-center/efs-burst-credits/). Hence the in-memory dataset and compression, which was crucial, since there are a lot of zeros in the grib files. This process would be much simplier if wgrib2 could export directly to NetCDF4 (since NetCDF3 doesn't have compression), but this is currently at the bleeding edge of [support](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/).
 
@@ -108,19 +111,24 @@ While the process is simple, the details here are tricky. This function had to r
 2. In order to get UV data, a seperate grib file is needed for the GFS model, as it is classified as a "Least commonly used parameter". The data ingest steps are the same, but there is an extra step where the wgrib2 `-append` [command ](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/append.html) is used to merge the two NetCDF3 files together.
 3. The ensemble data was by far the most difficult to deal with. There are several extra steps:
     * The 30 ensemble grib files for a given time step are merged and saved as a grib file in the `/tmp/`
-	* The wgrib2 `-ens_processing` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ens_processing.html) is then run on this merged grib file. It is an amazing command, and single handidly produces probability of precipitation, mean, and spread from the 30 member ensemble! 
+	* The wgrib2 `-ens_processing` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ens_processing.html) is then run on this merged grib file. It is an amazing command, and single handidly produces probability of precipitation, mean, and spread (which is used for precipitation intensity error) from the 30 member ensemble! 
 	* These three values are then exported to NetCDF3 files with the `-set_ext_name` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/var.html) set to 1
 	* The files are then converted to NetCDF 4 and chuncked in the same way
 4. For most variables, the `least significant digit` [parameter](https://unidata.github.io/netcdf4-python/#efficient-compression-of-netcdf-variables) is set to 1, and the compression level is also set to 1. There is probably some room for further optimization here. 
 
 ### Retrieval
 
-* NetCDF read
-* Interpolate 
-* Calculate other parameters
-* Icons
-* Sunrise/sunset
+When a arequest comes in, a Lambda function is triggered and is passed the URL parameters (latitude/ longitude/ extended forecast/ units) as a JSON payload. These are extracted, and then the [nearest grid cell](https://kbkb-wx-python.blogspot.com/2016/08/find-nearest-latitude-and-longitude.html)to the lat/long is found from the pickle files created from the model results. Weather variables are then iteratively extracted from the NetCDF4 files and saved to a 2-dimentional numpy arrays. This is then repeated for each model, skipping the HRRR results the requested location is outside of the HRRR domain. For the GFS model, precipitation accumilation is adjusted from the varying time step in teh grib file to a standard 1-hour time step. 
 
+Once the data has been read in, arrays area created for the minutely and hourly forecasts, and the data series from the model results is interpolated into these new output arrays. This process worked incredibly well, since NetCDF files natively save timestamps, so the same method could be followed for each data source. 
+
+Some precipitation parameters are true/false (will it rain, snow, hail, etc.), and for these, the same interpolation is done using 0 and 1, and then the precipitation category with the highest value is selected and saved. Currently a 10:1 snow to rain ratio is used (1 mm of rain is 10 mm of snow), but this could be improved. Where availible, HRRR sub-hourly results are used for minutely precipitation (and all currently results), and the GFS ensemble model is used for the hourly time series. Daily data is calculated by processing the hourly time series, calculating maximum, minimum, and mean values. 
+
+A few additional parameters are calculated without using the NOAA models. The increibly handy [timezonefinder](https://pypi.org/project/timezonefinder/) python library is used to determine the local time zone for a request, which is required to determine when days start and end and which icon to use. [Astral](https://pypi.org/project/astral/) is used for sunrise, sunset, and moon phases. Apparent temperature is found by adjusting for either [wind chill](https://en.wikipedia.org/wiki/Wind_chill) or [humidex](https://en.wikipedia.org/wiki/Humidex), and the [UV Index](https://en.wikipedia.org/wiki/Ultraviolet_index) is calculated from the modelled solar radiation. Dark Sky provides both `temperatureHigh` and `temperatureMax` values, and since I am not sure what the difference between them is, the same value is currently sed for both. 
+
+Icons are based on the categorical precipitation if it is expected, and the total cloud cover percentage and visibility otherwise. For weather alerts, a GeoJSON is downloaded every 10 minutes from the [NWS](https://api.weather.gov/alerts), and the requested point is iteravely checked to see if it is inside one of the alert polygons. If a point is inside an alert, the details are extracted from the GeoJSON and returned. 
+
+Finially, the processed forecast is converted into the requested units (defaulting to US customary units for compatability), and then into the returned JSON payload. The lambda function takes between 1-3 seconds to run, depending on if the point is inside the HRRR model domain, and how many alerts are currently active in the US. 
 
 ## AWS API
 
