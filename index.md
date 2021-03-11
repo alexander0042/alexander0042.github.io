@@ -65,7 +65,9 @@ There were two magor issues I ran into. One was that running out of space for th
 
 Beyond WGRIB2, I also created layers for [NetCDF4](https://unidata.github.io/netcdf4-python/), [Astral](https://pypi.org/project/astral/), [pytz](https://pypi.org/project/pytz/), and [timezonefinder](https://pypi.org/project/timezonefinder/). 
 
-### Data Ingest
+## Data Pipeline
+
+### Ingest
 
 Forecasts are saved from NOAA onto the [AWS Public Cloud](https://registry.opendata.aws/collab/noaa/) into two buckets for the [HRRR](https://registry.opendata.aws/noaa-hrrr-pds/) and [GFS](https://registry.opendata.aws/noaa-gfs-bdp-pds/) models. Each time a new file is added to these buckets, S3 sends a notification using AWS's [SNS](https://aws.amazon.com/sns/?whats-new-cards.sort-by=item.additionalFields.postDateTime&whats-new-cards.sort-order=desc), which triggers a Lambda function. 
 
@@ -74,20 +76,44 @@ This function first checks if the file added to NOAA's bucket (that triggered th
 For the HRRR model, the wind directions need to be converted from [grid relative to earth relative](https://github.com/blaylockbk/pyBKB_v2/blob/master/demos/HRRR_earthRelative_vs_gridRelative_winds.ipynb), using the wgrib2 `-new_grid_winds` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/new_grid_winds.html). For the GFS model, there are two accumilated precipitation fields (`APCP`), one representing 3 hours of accumilation, and one represeting 0 to the forecast hour. wgrib2 has a `-ncep_norm` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ncep_norm.html); however, it requires that all the time steps are in the same grib file, which isn't how they're saved to the buckets. Instead, I used tip #66 from the (ever handy) [wgrib2 tricks](https://www.ftp.cpc.ncep.noaa.gov/wd51we/wgrib2/tricks.wgrib2) site, and added the `-quit` command to stop wgrib2 from processing the second `APCP` record. 
 
 My complete pywgrib2_s command ended up looking like this:
-`pywgrib2_s.wgrib2([download_path, '-new_grid_winds', 'earth', '-new_grid_interpolation', 'neighbor', '-match', matchString, '-new_grid', HRRR_grid1, HRRR_grid2, HRRR_grid3, download_path_GB])`
-`pywgrib2_s.wgrib2([download_path, '-rewind_init', download_path, '-new_grid_winds', 'earth', '-new_grid_interpolation', 'neighbor', '-match', 'APCP', '-append','-new_grid', HRRR_grid1, HRRR_grid2, HRRR_grid3, download_path_GB, '-quit'])`
+1. `pywgrib2_s.wgrib2([download_path, '-new_grid_winds', 'earth', '-new_grid_interpolation', 'neighbor', '-match', matchString, '-new_grid', HRRR_grid1, HRRR_grid2, HRRR_grid3, download_path_GB])`
+
+2. `pywgrib2_s.wgrib2([download_path, '-rewind_init', download_path, '-new_grid_winds', 'earth', '-new_grid_interpolation', 'neighbor', '-match', 'APCP', '-append','-new_grid', HRRR_grid1, HRRR_grid2, HRRR_grid3, download_path_GB, '-quit'])`
+
 Where `matchString` was the list of parameters, `HRRR_grid1, HRRR_grid2, HRRR_grid3` are the HRRR grid parameters, and `download_path_GB` was the output file location.
 
 Once wgrib2 has run, the function then uploads the processed grib file to my own s3 bucket. Since only the key parameters are included, the bucket size is fairly small (<15 GB), but it does generate a **lot** of `PUT` requests, particularly for the ensemble forecast (240 hours/ 3 hours per forecast step is 80 files, multiplied by 4 model runs per day, multiplied by 30 ensemble members gives 9,600 actions a day, or about 300,000 per month). 
 
-### Data Processing
-* POP- ensemble
-* WGRIB2 to NetCDF
-* In-memory operations
-* NetCDF chunking 
-* NetCDF compression
+### Merge and Process
 
-### Data Retrieval
+Every time a new grib file is added to my S3 bucket, it generates a SNS event for the second set of  functions, which perform additional processing, merge the timesteps, and save the result as a NetCDF file. 
+
+Because the forecasts do not necessarily arrive in chronological order, it's not possibile to wait for a specific string to know that all the data has arrived. Instead, the function checks how many files have been saved, and starts running when all files are there. 
+
+My initial plan was to simply save the grib files to EFS and access them via py_wgrib2; however, despite EFS being very quick and wgrib2's optimizations, this was never fast enough to be realistics (~20 seconds). Eventuailly, I was pointed in the direction of a more structured file type, and since there was already a great NetCDF Python package, it seemed perfect! 
+
+The overall processing flow is fairly straightward:
+1. Download one forecast time step  to `\tmp\`
+2. Run the wgrib2 `-netcdf` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/netcdf.html) to save as a NetCDF3 file
+3. Create a new [in-memory](https://unidata.github.io/netcdf4-python/#in-memory-diskless-datasets) NetCDF4 file 
+4. Copy variables over from NetCDF3 to NetCDF4, enabling compression and significant digit limts for each one 
+5. Download subsiquent forecast time steps, convert to NetCDF3 and appand the data to the end of the NetCDF4 file
+6. [Chunk](https://www.unidata.ucar.edu/software/netcdf/workshops/2011/nc4chunking/) the NetCDF4 file by time to dramatically speed up access times and save to EFS
+
+While the process is simple, the details here are tricky. This function had to run quickly because it required significant amounts of memory, which drives up the Lambda bill, and also had to avoid writing to EFS as much as possibile, since that burned through my [burst credits ](https://aws.amazon.com/premiumsupport/knowledge-center/efs-burst-credits/). Hence the in-memory dataset and compression, which was crucial, since there are a lot of zeros in the grib files. This process would be much simplier if wgrib2 could export directly to NetCDF4 (since NetCDF3 doesn't have compression), but this is currently at the bleeding edge of [support](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/).
+
+#### Model Specific Notes
+
+1. Since the HRRR sub-hourly model saves four time steps to each grib file, each iteration four steps get copied over instead of one. 
+2. In order to get UV data, a seperate grib file is needed for the GFS model, as it is classified as a "Least commonly used parameter". The data ingest steps are the same, but there is an extra step where the wgrib2 `-append` [command ](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/append.html) is used to merge the two NetCDF3 files together.
+3. The ensemble data was by far the most difficult to deal with. There are several extra steps:
+    * The 30 ensemble grib files for a given time step are merged and saved as a grib file in the `/tmp/`
+	* The wgrib2 `-ens_processing` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ens_processing.html) is then run on this merged grib file. It is an amazing command, and single handidly produces probability of precipitation, mean, and spread from the 30 member ensemble! 
+	* These three values are then exported to NetCDF3 files with the `-set_ext_name` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/var.html) set to 1
+	* The files are then converted to NetCDF 4 and chuncked in the same way
+4. For most variables, the `least significant digit` [parameter](https://unidata.github.io/netcdf4-python/#efficient-compression-of-netcdf-variables) is set to 1, and the compression level is also set to 1. There is probably some room for further optimization here. 
+
+### Retrieval
 
 * NetCDF read
 * Interpolate 
@@ -95,7 +121,8 @@ Once wgrib2 has run, the function then uploads the processed grib file to my own
 * Icons
 * Sunrise/sunset
 
-### AWS API
+
+## AWS API
 
 * API Gateway 
 * Developer Portal
