@@ -2,12 +2,20 @@
 
 To try to address this, I've put together a service that reads weather forecasts and serves it following the [Dark Sky API](https://web.archive.org/web/20200723173936/https://darksky.net/dev/docs) style. Key details about setup/ usage of the API are on the main website <https://pirateweather.net/>, but I also wanted to give an overview of how I assembled all the pieces. I used many online guides during this process, so wanted to try to help someone else here! 
 
-Before I go any farther, I wanted to add a link to support this project. Running this on AWS means that it scales beautifully and is incredibly reliable, but also costs real money. I'd love to keep this project going long-term, but I'm still paying back my student loans, which limits how much I can spend on this! Anything helps, and a $2 monthly donation lets me raise your API limit from 1,000 calls/ month to 50,000 calls per month.
+Before going any farther, I wanted to add a link to support this project. Running this on AWS means that it scales beautifully and is incredibly reliable, but also costs real money. I'd love to keep this project going long-term, but I'm still paying back my student loans and my AWS credits expire in June, which limits how much I can spend on this! Anything helps, and a $2 monthly donation lets me raise your API limit from 5,000 calls/ month to 50,000 calls per month.
 
 <a href="https://www.buymeacoffee.com/pirateweather" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
+## Recent Updates- Spring 2021
+1. Implemenmted historic data retreival (Dark Sky's Time Machine function).
+2. Added a front-end viewer <https://weather.pirateweather.net/>.
+3. Improved the precipitation probabilites (ensemble members with accumilations greater than 1 mm, instead of 0).
+4. Fixed things that broke due to the new version of the GFS/ GEFS models.
+5. Several other small bug fixes, including improving the icon selection logic and UV index. 
+
+
 ## Background
-This project started from two points: as part of my [PhD](https://coastlines.engineering.queensu.ca/dunexrt), I had to become very familiar with working with NOAA forecast results (<https://orcid.org/0000-0003-4725-3251>). Separately, an old tablet set up as a "Magic Mirror,” and was using a [weather module](https://github.com/jclarke0000/MMM-DarkSkyForecast) that relied on the Dark Sky API. So when I heard that it was [shutting down](https://blog.darksky.net/dark-sky-has-a-new-home/), I thought, "I wonder if I could do this.” Plus, I love learning new things (<http://alexanderrey.ca/>), and I had been looking for a project to learn Python on so this seemed like the perfect opportunity!
+This project started from two points: as part of my [PhD](https://coastlines.engineering.queensu.ca/dunexrt), I had to become very familiar with working with NOAA forecast results (<https://orcid.org/0000-0003-4725-3251>). Separately, an old tablet set up as a "Magic Mirror,” and was using a [weather module](https://github.com/jclarke0000/MMM-DarkSkyForecast) that relied on the Dark Sky API. So when I heard that it was [shutting down](https://blog.darksky.net/dark-sky-has-a-new-home/), I thought, "I wonder if I could do this.” Plus, I love learning new things (<http://alexanderrey.ca/>), and I had been looking for a project to learn Python on, so this seemed like the perfect opportunity!
 
 Spoiler alert, but it was much, much more difficult than I thought, but learned a lot throughout the process, and I think the end result turned out really well! 
 
@@ -44,6 +52,10 @@ The Global Forecast System [(GFS)](https://www.ncdc.noaa.gov/data-access/model-d
 
 The GFS model also underpins the Global Ensemble Forecast System [(GEFS)](https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/global-ensemble-forecast-system-gefs), which is the 30-member ensemble (the website says 21, but there are 30 data files) version of the GFS. This means that 30 different "versions" of the model are run, each with slightly starting assumptions. The API uses the GEFS to get precipitation type, quantity, and probability, since it seemed like the most accurate way of determining this. I have no idea how Dark Sky did it, and I am very open to feedback about other ways it could be assigned, since getting the precipitation probability number turned out to be one of the most complex parts of the entire setup! 
 
+### ERA5
+To provide historic weather data, the [European Reanalysis 5 Dataset](https://registry.opendata.aws/ecmwf-era5/) is used. This source is particularly interesting, since unlike the real-time NOAA models that I need to convert, it's provided in the "cloud native" [Zarr](https://zarr.readthedocs.io/en/stable/) file format. This lets the data be accessed directly and quickly in S3 from Lambda. There aern't nearly as many many parameters availible as with the GFS or HRRR models, but there are enough to cover the most important variables. 
+
+
 #### Others
 There are a number of other models that I could have used as part of this API. The Canadian model [(HRDPS)](https://weather.gc.ca/grib/grib2_HRDPS_HR_e.html) is even higher resolution (2.5 km), and seems to do particularly well with precipitation. Also, the [European models](https://www.ecmwf.int/en/forecasts) are sometimes considered better global models than the GFS model is, which would make it a great addition. However, HRRR and GFS were enough to get things working, and since they are stored on AWS already, there were no data transfer costs! 
 
@@ -62,7 +74,7 @@ For this application, I wanted to use the [WGRIB2](https://www.cpc.ncep.noaa.gov
 
 There were two major issues I ran into. One was that running out of space for the layer, which I solved by going through the `site-packages` and removing anything that seemed unnecessary, the testing the function and hoping that everything worked. Particularly with pywgrib2, there were several large test/ documentation/ resources that are not required for every case, so I could get the layer to fit within the limit. The second problem was fixed by adding environmental variables for `PATH` and `LD_LIBRARY_PATH` pointing to subfolders with important libraries. I also found [this GitHub repo](https://github.com/mthenw/awesome-layers) of helpful Lambda layers and the [GeoLambda](https://github.com/developmentseed/geolambda) project. GeoLambda *almost* worked for everything, and would have been much easier, but didn't leave enough space to install WGRIB2. 
 
-Beyond WGRIB2, I also created layers for [NetCDF4](https://unidata.github.io/netcdf4-python/), [Astral](https://pypi.org/project/astral/), [pytz](https://pypi.org/project/pytz/), and [timezonefinder](https://pypi.org/project/timezonefinder/).
+Beyond WGRIB2, I also created layers for [NetCDF4](https://unidata.github.io/netcdf4-python/), [Astral](https://pypi.org/project/astral/), [pytz](https://pypi.org/project/pytz/), and [timezonefinder](https://pypi.org/project/timezonefinder/). To get historic data, I added a [Zarr](https://zarr.readthedocs.io/en/stable/) layer; however, it is too large to be combined with the NetCDF4 layer in Lambda, which is why it's a seperate API call compared to the forecast API.  
  
 ## Data Pipeline
 
@@ -104,10 +116,11 @@ While the process is simple, the details here are tricky. This function had to r
 2. In order to get UV data, a separate grib file is needed for the GFS model, as it is classified as a "Least commonly used parameters.” The data ingest steps are the same, but there is an extra step where the wgrib2 `-append` [command ](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/append.html) is used to merge the two NetCDF3 files together.
 3. The ensemble data was by far the most difficult to deal with. There are several extra steps:
     * The 30-ensemble grib files for a given time step are merged and saved as a grib file in the `/tmp/`
- * The wgrib2 `-ens_processing` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ens_processing.html) is then run on this merged grib file. It is an amazing command, and single-handedly produces probability of precipitation, mean, and spread (which is used for precipitation intensity error) from the 30-member ensemble! 
+ * The wgrib2 `-ens_processing` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/ens_processing.html) is then run on this merged grib file. This produces probability of precipitation, mean, and spread (which is used for precipitation intensity error) from the 30-member ensemble; however, it's provides the probability of any (>0) precipitation. Since this is a little too sensitive, I used the execellent wgrib2 [trick #65](https://www.ftp.cpc.ncep.noaa.gov/wd51we/wgrib2/tricks.wgrib2), which combines `-rpn` and `-set_prob` to allow arbitrary values to be used.
  * These three values are then exported to NetCDF3 files with the `-set_ext_name` [command](https://www.cpc.ncep.noaa.gov/products/wesley/wgrib2/var.html) set to 1
  * The files are then converted to NetCDF 4 and chucked in the same way
 4. For most variables, the `least significant digit` [parameter](https://unidata.github.io/netcdf4-python/#efficient-compression-of-netcdf-variables) is set to 1, and the compression level is also set to 1. There is probably some room for further optimization here. 
+
 
 ### Retrieval
 When a request comes in, a Lambda function is triggered and is passed the URL parameters (latitude/ longitude/ extended forecast/ units) as a JSON payload. These are extracted, and then the [nearest grid cell ](https://kbkb-wx-python.blogspot.com/2016/08/find-nearest-latitude-and-longitude.html)to the lat/long is found from the pickle files created from the model results. Weather variables are then iteratively extracted from the NetCDF4 files and saved to a 2-dimensional numpy arrays. This is then repeated for each model, skipping the HRRR results the requested location is outside of the HRRR domain. For the GFS model, precipitation accumulation is adjusted from the varying time step in the grib file to a standard 1-hour time step. 
@@ -122,6 +135,10 @@ Icons are based on the categorical precipitation if it is expected, and the tota
 
 Finally, the forecast is converted into the requested units (defaulting to US customary units for compatibility), and then into the returned JSON payload. The lambda function takes between 1 and 3 seconds to run, depending on if the point is inside the HRRR model domain, and how many alerts are currently active in the US. 
 
+#### Historic Data
+Historic data is saved in the AWS ERA5 bucket in Zarr format, which makes it incredibly easy to work with here! I mostly followed the process outlined here: <https://github.com/zflamig/birthday-weather>, with some minor tweaks to read one location instead of the entire domain and to [process accumilation variables](https://nbviewer.jupyter.org/github/awslabs/amazon-asdi/blob/main/examples/dask/notebooks/era5_zarr.ipynb). This dataset didn't include cloud cover, which presented a significant issue, since that is what's used to determine the weather icons. To work around this, I used the provided shortwave radiation flux variable and compared it against the [theortical clear sky radiation](https://www.mdpi.com/2072-4292/5/10/4735/htm). This isn't a perfect proxy, since it doesn't work at night, and there are other factors that can impact shortwave radiation other than cloud cover (notably elevation), but it provides a reasonable approxoation.
+
+
 ## AWS API
 The end of this service relies on two other AWS products, the [API Gateway](https://aws.amazon.com/api-gateway/) and [developer portal](https://aws.amazon.com/blogs/compute/generate-your-own-api-gateway-developer-portal/). I found the API Gateway (using the REST protocol) fairly straightforward- in this implantation there is one resource, a `GET` request to the custom domain name, which extracts the `{api-key}` and `{location}` from the URL as path parameters. It also checks for URL query parameters. This method then authenticates the request, passes it to the Lambda function, and returns the result. 
 
@@ -131,12 +148,21 @@ After a few attempts, what ended up working was a custom Lambda Authorizer as de
 
 The developer portal is as close to a one-click deployment as possible! All that was required to click "Deploy" from the [serverless repository page](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:563878140293:applications~api-gateway-dev-portal), and a series of resources are created to handle the webpage, sign in, usage, and monitoring! The only issues I ran into were making sure that my S3 bucket names were not too long and using the CloudFront [Invalidate](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html) tool to check how new content looks!
 
+
+## Website Access
+
+To provide an easy front-end to this API, I setup a vue.js website <https://weather.pirateweather.net> based off of [weather-vue](https://github.com/krestaino/weather-vue). This project was the ideal framwork, since it already relied on the Dark Sky API for forecast data, and was well documented and easy to work with. I (modified the source](https://github.com/alexander0042/weather-vue) to use Pirate Weather, as well as adding minutely and hourly forecast data! 
+
+The static webpage is built using vue and chart.js, integrated together following [this comment](https://stackoverflow.com/questions/55684836/how-to-update-a-chart-using-vuejs-and-chartjs) (check out the ForecastMinute.vue file in the repository for my implementation). The page relies on a [back-end server](https://github.com/alexander0042/weather-api), which didn't require any modifications beyond using a Dockerfile to run on Heroku. I added the line:
+
+`RUN sed -i 's/api.darksky.net/api.pirateweather.net/g' <file path>` to the Dockerfile, where `<file path>` is the path to the node.js Dark Sky module (ex. `/app/node_modules/dark-sky/dark-sky-api.js`. 
+
+
 ## Next Steps
 While this service currently covers almost everything that the Dark Sky API does, I have a few ideas for future improvements to this service! 
 1. Text Summaries. First and foremost, this is the largest missing piece. Dark Sky [open-sourced](https://github.com/darkskyapp/translations) their translation library, so my plan is to build off that to get this working. All the data is there, but it's a matter of writing the logics required to go from numerical forecasts to weather summaries. 
 2. Documentation. While the archived Dark Sky API [documentation](https://web.archive.org/web/20200723173936/https://darksky.net/dev/docs) is great for now, the AWS API Gateway has a number of tools for adding my own documentation, which would make everything clearer and more accessible.
-3. Historic (Time Machine) Requests. Now that the AWS HRRR bucket saves results in [Zarr](https://registry.opendata.aws/noaa-hrrr-pds/), I'm interested to see if this provides fast enough response times to read data directly from the bucket, without requiring the complicated NetCDF transformation I am doing here. This could both reduce the processing load for the forecast service, but also allow for historic data to be extracted. Another alternative is using the [GDAL](https://gdal.org/drivers/raster/grib.html) S3 and grib drivers to read typical grib files off of S3. I tried using this for forecasts initially, but found it to be too slow for time-series data. However, since historic requests are only accessing a handful of time steps, it might be fast enough for this application!
-4. Additional sources. The method developed here is largely source agnostic. Any weather forecast service that delivers data using grib files that wgrib2 can understand (all the primary ones) is theoretically capable of being added in. The NOAA North American Mesoscale [NAM](https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-mesoscale-forecast-system-nam) model would provide higher resolution forecasts out to 4 days (instead of the 2 days from HRRR). The [Canadian HRDPS Model](https://weather.gc.ca/grib/grib2_HRDPS_HR_e.html) is another tempting addition, since it provides data at a resolution even higher than HRRR (2.5 km vs. 3.5 km)! The [European model](https://www.ecmwf.int/en/forecasts/datasets/catalogue-ecmwf-real-time-products) would be fantastic to add in, since it often outperforms the GFS model; however, the data is not open, which would add a significant cost.
+3. Additional sources. The method developed here is largely source agnostic. Any weather forecast service that delivers data using grib files that wgrib2 can understand (all the primary ones) is theoretically capable of being added in. The NOAA North American Mesoscale [NAM](https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-mesoscale-forecast-system-nam) model would provide higher resolution forecasts out to 4 days (instead of the 2 days from HRRR). The [Canadian HRDPS Model](https://weather.gc.ca/grib/grib2_HRDPS_HR_e.html) is another tempting addition, since it provides data at a resolution even higher than HRRR (2.5 km vs. 3.5 km)! The [European model](https://www.ecmwf.int/en/forecasts/datasets/catalogue-ecmwf-real-time-products) would be fantastic to add in, since it often outperforms the GFS model; however, the data is not open, which would add a significant cost.
 
 
  
