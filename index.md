@@ -1,7 +1,7 @@
 ﻿Weather forecasts are primarily found using models run by government agencies, but the outputs aren't easy to use or in formats built for the web.
 To try to address this, I've put together a service that reads weather forecasts and serves it following the [Dark Sky API](https://web.archive.org/web/20200723173936/https://darksky.net/dev/docs) style. Key details about setup/ usage of the API are on the main website <https://pirateweather.net/>, but I also wanted to give an overview of how I assembled all the pieces. I used many online guides during this process, so wanted to try to help someone else here! 
 
-Before going any farther, I wanted to add a link to support this project. Running this on AWS means that it scales beautifully and is incredibly reliable, but also costs real money. I'd love to keep this project going long-term, but I'm still paying back my student loans and my AWS credits expire in June, which limits how much I can spend on this! Anything helps, and a $2 monthly donation lets me raise your API limit from 5,000 calls/ month to 25,000 calls per month.
+Before going any farther, I wanted to add a link to support this project. Running this on AWS means that it scales beautifully and is incredibly reliable, but also costs real money. I'd love to keep this project going long-term, but I'm still paying back my student loans and my AWS credits won't last forever, which limits how much I can spend on this! Anything helps, and a $2 monthly donation lets me raise your API limit from 20,000 calls/ month to 25,000 calls per month.
 
 <a href="https://www.buymeacoffee.com/pirateweather" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
@@ -160,6 +160,9 @@ While this service currently covers almost everything that the Dark Sky API does
 3. Additional sources. The method developed here is largely source agnostic. Any weather forecast service that delivers data using grib files that wgrib2 can understand (all the primary ones) is theoretically capable of being added in. The NOAA North American Mesoscale [NAM](https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-mesoscale-forecast-system-nam) model would provide higher resolution forecasts out to 4 days (instead of the 2 days from HRRR). The [Canadian HRDPS Model](https://weather.gc.ca/grib/grib2_HRDPS_HR_e.html) is another tempting addition, since it provides data at a resolution even higher than HRRR (2.5 km vs. 3.5 km)! The [European model](https://www.ecmwf.int/en/forecasts/datasets/catalogue-ecmwf-real-time-products) would be fantastic to add in, since it often outperforms the GFS model; however, the data is not open, which would add a significant cost.
 
 ## Changelog
+* October 4, 2021
+  * Still working on bringing the NBM datasource online, but in the meantime I fixed a couple issues with [cloud cover](https://github.com/alexander0042/pirate-weather-ha/issues/18) and [pressure](https://github.com/alexander0042/pirate-weather-ha/issues/14) data responses.
+  * The back end of this service is also getting more stable and predictable, so I've raised the free tier to 20,000 API calls/ month.
 * August 17, 2021
   * Fixed how the API returns calls for locations at the edge of the grid, identified [here](https://github.com/alexander0042/pirate-weather-ha/issues/9)
 * July 26, 2021:
